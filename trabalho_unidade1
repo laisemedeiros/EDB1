@@ -18,11 +18,15 @@ struct Resultado {
     double tempoMergeSort;
 };
 
+// Busca Sequencial
 bool buscaSequencial(const vector<int>& vet, int alvo) {
-    for (int x : vet) if (x == alvo) return true;
+    for (int x : vet) {
+        if (x == alvo) return true;
+    }
     return false;
 }
 
+// Busca Binária
 bool buscaBinaria(const vector<int>& vet, int alvo) {
     int esq = 0, dir = (int)vet.size() - 1;
     while (esq <= dir) {
@@ -34,6 +38,7 @@ bool buscaBinaria(const vector<int>& vet, int alvo) {
     return false;
 }
 
+// Insertion Sort
 void insertionSort(vector<int>& vet) {
     int n = (int)vet.size();
     for (int i = 1; i < n; i++) {
@@ -47,14 +52,19 @@ void insertionSort(vector<int>& vet) {
     }
 }
 
+// Merge Sort
 void merge(vector<int>& vet, int esq, int meio, int dir) {
     int n1 = meio - esq + 1;
     int n2 = dir - meio;
     vector<int> L(n1), R(n2);
     for (int i = 0; i < n1; i++) L[i] = vet[esq + i];
     for (int j = 0; j < n2; j++) R[j] = vet[meio + 1 + j];
+    
     int i = 0, j = 0, k = esq;
-    while (i < n1 && j < n2) vet[k++] = (L[i] <= R[j]) ? L[i++] : R[j++];
+    while (i < n1 && j < n2) {
+        if (L[i] <= R[j]) vet[k++] = L[i++];
+        else vet[k++] = R[j++];
+    }
     while (i < n1) vet[k++] = L[i++];
     while (j < n2) vet[k++] = R[j++];
 }
@@ -68,11 +78,7 @@ void mergeSort(vector<int>& vet, int esq, int dir) {
     }
 }
 
-/**
- * @brief Mede o tempo médio de execução de uma função.
- */
 double medirTempoMedio(const function<void()>& algoritmo, int repeticoes) {
-    // Warm-up
     algoritmo();
 
     double tempoTotal = 0;
@@ -99,55 +105,64 @@ void executarColeta() {
     const int N_MIN = 1000;
     const int N_MAX = 10000;
     const int PASSO = 1000;
-    const int REPS = 10;
+    const int REPS = 5;
 
-    // Vetor para armazenar os pares (n, tempo) em memória
     vector<Resultado> listaResultados;
 
-    cout << "A iniciar recolha de dados..." << endl;
+    cout << "Iniciando coleta de dados empiricos..." << endl;
     cout << fixed << setprecision(4);
-    cout << "N\tSeq\tBin\tIns\tMerge" << endl;
+    cout << "N\tBuscaSeq\tBuscaBin\tInsSort\tMergeSort" << endl;
+    cout << "------------------------------------------------------------" << endl;
 
     for (int n = N_MIN; n <= N_MAX; n += PASSO) {
         vector<int> vOriginal = gerarVetor(n);
         vector<int> vOrdenado = vOriginal;
         sort(vOrdenado.begin(), vOrdenado.end());
+        
         int alvo = vOriginal[n / 2];
 
-        // Medições
         double tSeq = medirTempoMedio([&]() { buscaSequencial(vOriginal, alvo); }, REPS);
+        
         double tBin = medirTempoMedio([&]() { buscaBinaria(vOrdenado, alvo); }, REPS);
+        
         double tIns = medirTempoMedio([&]() { 
-            vector<int> v = vOriginal; 
-            insertionSort(v); 
+            vector<int> vParaOrdenar = vOriginal; 
+            insertionSort(vParaOrdenar); 
         }, REPS);
+        
         double tMerge = medirTempoMedio([&]() { 
-            vector<int> v = vOriginal; 
-            mergeSort(v, 0, n - 1); 
+            vector<int> vParaOrdenar = vOriginal; 
+            mergeSort(vParaOrdenar, 0, (int)vParaOrdenar.size() - 1); 
         }, REPS);
 
-        // ARMAZENAMENTO: Criar par (n, tempos) e guardar na lista
         listaResultados.push_back({n, tSeq, tBin, tIns, tMerge});
 
-        cout << n << "\t" << tSeq << "\t" << tBin << "\t" << tIns << "\t" << tMerge << endl;
+        cout << n << "\t" << tSeq << "\t\t" << tBin << "\t\t" << tIns << "\t" << tMerge << endl;
     }
 
-    // PERSISTÊNCIA: Gravar a lista de resultados no ficheiro CSV
     ofstream arquivo("dados_empiricos.csv");
-    arquivo << "n,BuscaSeq,BuscaBin,Insertion,Merge" << endl;
-    for (const auto& res : listaResultados) {
-        arquivo << res.n << "," 
-                << res.tempoBuscaSeq << "," 
-                << res.tempoBuscaBin << "," 
-                << res.tempoInsertionSort << "," 
-                << res.tempoMergeSort << endl;
+    if (arquivo.is_open()) {
+        arquivo << "n,BuscaSeq,BuscaBin,Insertion,Merge" << endl;
+        for (const auto& res : listaResultados) {
+            arquivo << res.n << "," 
+                    << res.tempoBuscaSeq << "," 
+                    << res.tempoBuscaBin << "," 
+                    << res.tempoInsertionSort << "," 
+                    << res.tempoMergeSort << endl;
+        }
+        arquivo.close();
+        cout << "\n[SUCESSO] Dados salvos em 'dados_empiricos.csv'." << endl;
+    } else {
+        cerr << "\n[ERRO] Nao foi possivel criar o arquivo CSV." << endl;
     }
-    arquivo.close();
-
-    cout << "\nSucesso: " << listaResultados.size() << " pares (n, tempo) armazenados em 'dados_empiricos.csv'." << endl;
 }
 
 int main() {
-    executarColeta();
+    try {
+        executarColeta();
+    } catch (const exception& e) {
+        cerr << "Erro inesperado: " << e.what() << endl;
+        return 1;
+    }
     return 0;
 }
