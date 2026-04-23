@@ -1,0 +1,153 @@
+#include <iostream>
+#include <vector>
+#include <chrono>
+#include <algorithm>
+#include <random>
+#include <fstream>
+#include <functional>
+#include <iomanip>
+
+using namespace std;
+using namespace std::chrono;
+
+struct Resultado {
+    int n;
+    double tempoBuscaSeq;
+    double tempoBuscaBin;
+    double tempoInsertionSort;
+    double tempoMergeSort;
+};
+
+bool buscaSequencial(const vector<int>& vet, int alvo) {
+    for (int x : vet) if (x == alvo) return true;
+    return false;
+}
+
+bool buscaBinaria(const vector<int>& vet, int alvo) {
+    int esq = 0, dir = (int)vet.size() - 1;
+    while (esq <= dir) {
+        int meio = esq + (dir - esq) / 2;
+        if (vet[meio] == alvo) return true;
+        if (vet[meio] < alvo) esq = meio + 1;
+        else dir = meio - 1;
+    }
+    return false;
+}
+
+void insertionSort(vector<int>& vet) {
+    int n = (int)vet.size();
+    for (int i = 1; i < n; i++) {
+        int chave = vet[i];
+        int j = i - 1;
+        while (j >= 0 && vet[j] > chave) {
+            vet[j + 1] = vet[j];
+            j--;
+        }
+        vet[j + 1] = chave;
+    }
+}
+
+void merge(vector<int>& vet, int esq, int meio, int dir) {
+    int n1 = meio - esq + 1;
+    int n2 = dir - meio;
+    vector<int> L(n1), R(n2);
+    for (int i = 0; i < n1; i++) L[i] = vet[esq + i];
+    for (int j = 0; j < n2; j++) R[j] = vet[meio + 1 + j];
+    int i = 0, j = 0, k = esq;
+    while (i < n1 && j < n2) vet[k++] = (L[i] <= R[j]) ? L[i++] : R[j++];
+    while (i < n1) vet[k++] = L[i++];
+    while (j < n2) vet[k++] = R[j++];
+}
+
+void mergeSort(vector<int>& vet, int esq, int dir) {
+    if (esq < dir) {
+        int meio = esq + (dir - esq) / 2;
+        mergeSort(vet, esq, meio);
+        mergeSort(vet, meio + 1, dir);
+        merge(vet, esq, meio, dir);
+    }
+}
+
+/**
+ * @brief Mede o tempo médio de execução de uma função.
+ */
+double medirTempoMedio(const function<void()>& algoritmo, int repeticoes) {
+    // Warm-up
+    algoritmo();
+
+    double tempoTotal = 0;
+    for (int i = 0; i < repeticoes; ++i) {
+        auto inicio = high_resolution_clock::now();
+        algoritmo();
+        auto fim = high_resolution_clock::now();
+        
+        duration<double, milli> tempo = fim - inicio;
+        tempoTotal += tempo.count();
+    }
+    return tempoTotal / repeticoes;
+}
+
+vector<int> gerarVetor(int n) {
+    vector<int> v(n);
+    static mt19937 gen(123);
+    uniform_int_distribution<> dis(1, n * 10);
+    for (int i = 0; i < n; i++) v[i] = dis(gen);
+    return v;
+}
+
+void executarColeta() {
+    const int N_MIN = 1000;
+    const int N_MAX = 10000;
+    const int PASSO = 1000;
+    const int REPS = 10;
+
+    // Vetor para armazenar os pares (n, tempo) em memória
+    vector<Resultado> listaResultados;
+
+    cout << "A iniciar recolha de dados..." << endl;
+    cout << fixed << setprecision(4);
+    cout << "N\tSeq\tBin\tIns\tMerge" << endl;
+
+    for (int n = N_MIN; n <= N_MAX; n += PASSO) {
+        vector<int> vOriginal = gerarVetor(n);
+        vector<int> vOrdenado = vOriginal;
+        sort(vOrdenado.begin(), vOrdenado.end());
+        int alvo = vOriginal[n / 2];
+
+        // Medições
+        double tSeq = medirTempoMedio([&]() { buscaSequencial(vOriginal, alvo); }, REPS);
+        double tBin = medirTempoMedio([&]() { buscaBinaria(vOrdenado, alvo); }, REPS);
+        double tIns = medirTempoMedio([&]() { 
+            vector<int> v = vOriginal; 
+            insertionSort(v); 
+        }, REPS);
+        double tMerge = medirTempoMedio([&]() { 
+            vector<int> v = vOriginal; 
+            mergeSort(v, 0, n - 1); 
+        }, REPS);
+
+        // ARMAZENAMENTO: Criar par (n, tempos) e guardar na lista
+        listaResultados.push_back({n, tSeq, tBin, tIns, tMerge});
+
+        cout << n << "\t" << tSeq << "\t" << tBin << "\t" << tIns << "\t" << tMerge << endl;
+    }
+
+    // PERSISTÊNCIA: Gravar a lista de resultados no ficheiro CSV
+    ofstream arquivo("dados_empiricos.csv");
+    arquivo << "n,BuscaSeq,BuscaBin,Insertion,Merge" << endl;
+    for (const auto& res : listaResultados) {
+        arquivo << res.n << "," 
+                << res.tempoBuscaSeq << "," 
+                << res.tempoBuscaBin << "," 
+                << res.tempoInsertionSort << "," 
+                << res.tempoMergeSort << endl;
+    }
+    arquivo.close();
+
+    cout << "\nSucesso: " << listaResultados.size() << " pares (n, tempo) armazenados em 'dados_empiricos.csv'." << endl;
+}
+
+int main() {
+    executarColeta();
+    return 0;
+}
